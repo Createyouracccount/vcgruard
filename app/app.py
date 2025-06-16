@@ -18,6 +18,8 @@ from services.tts_service import tts_service      # 경로 수정
 from config.settings import settings
 from utils.validators import validate_environment
 
+from core.learning_enhanced_analyzer import LearningEnhancedAnalyzer
+
 logger = logging.getLogger(__name__)
 
 class AppState(Enum):
@@ -27,7 +29,6 @@ class AppState(Enum):
     RUNNING = "running"
     SHUTTING_DOWN = "shutting_down"
     ERROR = "error"
-
 class VoiceGuardApp:
     """VoiceGuard AI 메인 애플리케이션"""
     

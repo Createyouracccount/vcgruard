@@ -9,11 +9,49 @@ import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
+from core.learning_enhanced_analyzer import LearningEnhancedAnalyzer
 from config.settings import scam_config, detection_thresholds
 from config.prompts.detection_prompts import DETECTION_PROMPTS
 
+from core.llm_manager import llm_manager
+
 logger = logging.getLogger(__name__)
 
+class EvolutionaryVoicePhishingAnalyzer(LearningEnhancedAnalyzer):
+    """진화형 보이스피싱 분석기 - 기존 시스템과 호환"""
+    
+    def __init__(self, llm_manager):
+        super().__init__(llm_manager)
+        
+        # 기존 시스템과의 호환성 유지
+        self.legacy_mode = True
+        
+    async def analyze_text(self, text: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """기존 analyze_text 메서드 호환"""
+        
+        # 학습 강화 분석 수행
+        enhanced_result = await self.analyze_with_learning(text, context)
+        
+        # 기존 형식으로 변환 (하위 호환성)
+        legacy_result = {
+            "risk_score": enhanced_result["final_risk_score"],
+            "risk_level": enhanced_result["risk_level"],
+            "scam_type": enhanced_result["scam_type"],
+            "confidence": enhanced_result["confidence"],
+            "key_indicators": enhanced_result["key_indicators"],
+            "immediate_action": enhanced_result["final_risk_score"] >= 0.8,
+            "reasoning": enhanced_result["reasoning"],
+            "recommendation": enhanced_result["recommendation"],
+            
+            # 새로운 학습 정보 추가
+            "learning_enhanced": True,
+            "analysis_id": enhanced_result["analysis_id"],
+            "few_shot_applied": enhanced_result["few_shot_applied"],
+            "patterns_matched": enhanced_result["patterns_matched"]
+        }
+        
+        return legacy_result
+    
 class VoicePhishingAnalyzer:
     """보이스피싱 분석 엔진"""
     
@@ -372,3 +410,15 @@ class VoicePhishingAnalyzer:
         }
         
         logger.info("분석 엔진 통계 초기화됨")
+
+try:
+    from .learning_enhanced_analyzer import LearningEnhancedAnalyzer
+    # 학습 강화 분석기 테스트
+    learning_analyzer = LearningEnhancedAnalyzer(llm_manager)
+    print("🧠 학습 강화 분석기 로드 성공!")
+except Exception as e:
+    print(f"⚠️ 학습 분석기 로드 실패: {e}")
+    learning_analyzer = None
+
+
+analyzer = LearningEnhancedAnalyzer(llm_manager)

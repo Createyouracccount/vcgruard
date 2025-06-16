@@ -2,6 +2,7 @@
 VoiceGuard AI - 설정 패키지
 시스템 전반의 설정 및 구성 관리
 """
+from .learning_enhanced_analyzer import LearningEnhancedAnalyzer
 
 from config.settings import (
     settings,
