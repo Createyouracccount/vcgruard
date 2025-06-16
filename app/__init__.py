@@ -6,7 +6,7 @@ VoiceGuard AI - 운영 모드 패키지 (업데이트)
 from app.modes.base_mode import BaseMode, ModeState
 from app.modes.detection_mode import DetectionMode
 from app.modes.prevention_mode import PreventionMode
-from app.modes.post_incident_mode import PostIncidentMode  # 완전 구현된 버전 import
+from app.modes.post_incident_mode import PostIncidentMode
 
 # 간소화된 상담 모드 (기존 유지)
 class ConsultationMode(BaseMode):
@@ -74,7 +74,7 @@ A: 1) 즉시 112 신고
 MODE_REGISTRY = {
     'prevention': PreventionMode,
     'detection': DetectionMode,
-    'post_incident': PostIncidentMode,  # 완전 구현된 버전
+    'post_incident': PostIncidentMode, 
     'consultation': ConsultationMode
 }
 
@@ -197,7 +197,7 @@ __all__ = [
     'ModeState',
     'DetectionMode', 
     'PreventionMode', 
-    'PostIncidentMode',  # 완전 구현된 버전
+    'PostIncidentMode',
     'ConsultationMode',
     'MODE_REGISTRY',
     'get_mode_class',

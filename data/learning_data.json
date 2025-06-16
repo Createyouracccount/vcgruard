@@ -1,0 +1,56 @@
+{
+  "timestamp": "2025-06-16T14:10:47.198601",
+  "adaptive_patterns": {},
+  "few_shot_pool": {
+    "government_scam": [
+      {
+        "text": "안녕하십니까. 금융감독원 전자금융과에서 연락드렸습니다. 고객님의 계좌가 범죄에 연루되어 즉시 조치가 필요합니다.",
+        "label": "scam",
+        "reasoning": "금융감독원은 개인에게 직접 전화하여 계좌 관련 조치를 요구하지 않음",
+        "confidence": 0.95
+      },
+      {
+        "text": "검찰청 수사관입니다. 귀하와 관련된 사건으로 출석하셔야 합니다.",
+        "label": "scam",
+        "reasoning": "검찰청 출석은 공문으로 통지하며 전화로 개인 연락하지 않음",
+        "confidence": 0.93
+      }
+    ],
+    "family_emergency": [
+      {
+        "text": "어머니, 저 아들이에요. 교통사고 나서 응급실에 있는데 수술비가 급해요.",
+        "label": "scam",
+        "reasoning": "가족 확인 없이 급한 금전 요구, 실제 응급상황시 병원에서 공식 연락",
+        "confidence": 0.88
+      },
+      {
+        "text": "할아버지, 손자예요. 사채업자들한테 잡혀서 돈이 급해요.",
+        "label": "scam",
+        "reasoning": "가족 관계 이용한 감정 조작, 불법 상황 언급으로 신고 회피 유도",
+        "confidence": 0.91
+      }
+    ],
+    "legitimate_calls": [
+      {
+        "text": "안녕하세요. 고객님께서 신청하신 대출 심사 결과를 안내드리려고 연락드렸습니다.",
+        "label": "legitimate",
+        "reasoning": "고객이 사전 신청한 서비스에 대한 결과 안내",
+        "confidence": 0.85
+      },
+      {
+        "text": "배송 예정이던 택배가 주소 문제로 배송이 어려워 연락드렸습니다.",
+        "label": "legitimate",
+        "reasoning": "구체적인 배송 관련 문의, 개인정보 요구 없음",
+        "confidence": 0.8
+      }
+    ]
+  },
+  "performance_tracker": {
+    "total_analyses": 0,
+    "user_feedback_count": 0,
+    "accuracy_trend": [],
+    "pattern_evolution": [],
+    "learning_cycles": 0
+  },
+  "learning_examples_count": 0
+}

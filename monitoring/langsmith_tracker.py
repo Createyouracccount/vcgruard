@@ -234,9 +234,8 @@ class LangSmithTracker:
     def _calculate_cost(self, model_name: str, tokens: int) -> float:
         """비용 계산"""
         cost_per_1k = {
-            "gpt-4": ai_config.GPT4.cost_per_1k_tokens,
+            "gemini-1.5-flash": ai_config.GEMINI.cost_per_1k_tokens,
             "gpt-3.5-turbo": ai_config.GPT35_TURBO.cost_per_1k_tokens,
-            "claude-3-sonnet": ai_config.CLAUDE.cost_per_1k_tokens
         }
         
         base_model = model_name.split("-")[0] if "-" in model_name else model_name

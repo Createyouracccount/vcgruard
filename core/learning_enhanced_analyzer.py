@@ -15,8 +15,11 @@ import hashlib
 
 from collections import defaultdict, Counter
 
-from core.analyzer import VoicePhishingAnalyzer
+# 순환 import 방지 - analyzer는 동적 로딩
 from core.llm_manager import llm_manager
+from config.settings import detection_thresholds
+
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +46,22 @@ class AdaptivePattern:
     last_updated: datetime
     examples: List[str]
 
-class LearningEnhancedAnalyzer(VoicePhishingAnalyzer):
+class LearningEnhancedAnalyzer:
     """학습 기능이 강화된 분석기"""
     
     def __init__(self, llm_manager):
-        super().__init__(llm_manager)
+        self.llm_manager = llm_manager
+        
+        # 기본 분석 기능 (analyzer.py에서 복사)
+        self.stats = {
+            'total_analyses': 0,
+            'high_risk_detections': 0,
+            'avg_analysis_time': 0.0,
+            'pattern_matches': {}
+        }
+        
+        # 기본 키워드 패턴
+        self.quick_patterns = self._build_quick_patterns()
         
         # 학습 데이터 저장소
         self.learning_examples: List[LearningExample] = []
@@ -78,6 +92,29 @@ class LearningEnhancedAnalyzer(VoicePhishingAnalyzer):
         self._load_existing_data()
         
         logger.info("🧠 학습 강화 분석기 초기화 완료")
+    
+    def _build_quick_patterns(self) -> Dict[str, Any]:
+        """기본 키워드 패턴 (analyzer.py와 동일)"""
+        
+        patterns = {
+            'critical_keywords': [
+                '납치', '유괴', '죽는다', '체포영장', '계좌동결', '응급실'
+            ],
+            'high_risk_keywords': [
+                '금융감독원', '검찰청', '경찰서', '수사', '조사', '범죄', '피의자'
+            ],
+            'medium_risk_keywords': [
+                '대출', '저금리', '정부지원금', '환급', '당첨', '만나서', '직접'
+            ],
+            'financial_keywords': [
+                '계좌번호', '비밀번호', '송금', '이체', '현금', '카드번호'
+            ],
+            'app_keywords': [
+                '앱설치', '다운로드', '권한', '허용', '업데이트', '인증'
+            ]
+        }
+        
+        return patterns
     
     def _initialize_few_shot_pool(self) -> Dict[str, List[Dict]]:
         """Few-shot 예시 풀 초기화"""
@@ -128,6 +165,32 @@ class LearningEnhancedAnalyzer(VoicePhishingAnalyzer):
                 }
             ]
         }
+    
+    async def analyze_text(self, text: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """기본 analyze_text 메서드 (하위 호환성)"""
+        
+        # 학습 강화 분석 수행
+        enhanced_result = await self.analyze_with_learning(text, context)
+        
+        # 기존 형식으로 변환 (하위 호환성)
+        legacy_result = {
+            "risk_score": enhanced_result["final_risk_score"],
+            "risk_level": enhanced_result["risk_level"],
+            "scam_type": enhanced_result["scam_type"],
+            "confidence": enhanced_result["confidence"],
+            "key_indicators": enhanced_result["key_indicators"],
+            "immediate_action": enhanced_result["final_risk_score"] >= 0.8,
+            "reasoning": enhanced_result["reasoning"],
+            "recommendation": enhanced_result["recommendation"],
+            
+            # 새로운 학습 정보 추가
+            "learning_enhanced": True,
+            "analysis_id": enhanced_result["analysis_id"],
+            "few_shot_applied": enhanced_result["few_shot_applied"],
+            "patterns_matched": enhanced_result["patterns_matched"]
+        }
+        
+        return legacy_result
     
     async def analyze_with_learning(self, text: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
         """학습 기능이 통합된 분석"""
