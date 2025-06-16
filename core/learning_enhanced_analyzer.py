@@ -1,6 +1,8 @@
 """
-VoiceGuard AI - 학습 강화 보이스피싱 분석기
+VoiceGuard AI - 학습 강화 보이스피싱 분석기 (순환 import 해결 버전)
 기존 시스템에 점진적 학습 기능 추가
+
+파일 위치: core/learning_enhanced_analyzer.py
 """
 
 import asyncio
@@ -18,8 +20,6 @@ from collections import defaultdict, Counter
 # 순환 import 방지 - analyzer는 동적 로딩
 from core.llm_manager import llm_manager
 from config.settings import detection_thresholds
-
-logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -198,8 +198,8 @@ class LearningEnhancedAnalyzer:
         start_time = time.time()
         context = context or {}
         
-        # 1. 기본 분석 수행
-        base_result = await super().analyze_text(text, context)
+        # 1. 기본 분석 수행 (키워드 + LLM)
+        base_result = await self._basic_analysis(text, context)
         
         # 2. Few-shot Learning 적용
         few_shot_result = await self._apply_few_shot_learning(text, context)
@@ -223,7 +223,7 @@ class LearningEnhancedAnalyzer:
                 "pattern_confidence": pattern_result.get("confidence", 0)
             }
         })
-        
+
         # 6. 성능 추적 업데이트
         self.performance_tracker["total_analyses"] += 1
         
@@ -231,6 +231,117 @@ class LearningEnhancedAnalyzer:
         logger.info(f"🧠 학습 강화 분석 완료: {processing_time:.3f}초")
         
         return integrated_result
+    
+    async def _basic_analysis(self, text: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """기본 분석 (키워드 + LLM)"""
+        
+        # 키워드 분석
+        quick_result = self._quick_keyword_analysis(text)
+        
+        # LLM 분석
+        if quick_result['risk_score'] < 0.2:
+            return {
+                'risk_score': quick_result['risk_score'],
+                'confidence': 0.8,
+                'scam_type': '해당없음',
+                'key_indicators': quick_result['scam_indicators'],
+                'reasoning': '키워드 분석 결과 저위험',
+                'method': 'keyword_only'
+            }
+        
+        try:
+            llm_result = await self.llm_manager.analyze_scam_risk(
+                text=text,
+                context={
+                    **context,
+                    'preliminary_risk': quick_result['risk_score'],
+                    'detected_indicators': quick_result['scam_indicators']
+                }
+            )
+            
+            return {
+                'risk_score': llm_result.metadata.get('risk_score', 0.5),
+                'confidence': llm_result.confidence,
+                'scam_type': llm_result.metadata.get('scam_type', 'unknown'),
+                'key_indicators': llm_result.metadata.get('key_indicators', []),
+                'reasoning': llm_result.content,
+                'method': 'keyword_llm'
+            }
+            
+        except Exception as e:
+            logger.error(f"기본 LLM 분석 실패: {e}")
+            return {
+                'risk_score': quick_result['risk_score'],
+                'confidence': 0.6,
+                'scam_type': self._estimate_scam_type(quick_result['scam_indicators']),
+                'key_indicators': quick_result['scam_indicators'],
+                'reasoning': f'LLM 분석 실패: {e}',
+                'method': 'keyword_fallback'
+            }
+    
+    def _quick_keyword_analysis(self, text: str) -> Dict[str, Any]:
+        """빠른 키워드 기반 분석 (analyzer.py와 동일)"""
+        
+        text_lower = text.lower()
+        risk_score = 0.0
+        detected_patterns = []
+        scam_indicators = []
+        
+        # 각 패턴별 점수 계산
+        for pattern_type, keywords in self.quick_patterns.items():
+            matches = [kw for kw in keywords if kw in text_lower]
+            
+            if matches:
+                detected_patterns.append(pattern_type)
+                scam_indicators.extend(matches)
+                
+                # 패턴별 가중치
+                if pattern_type == 'critical_keywords':
+                    risk_score += len(matches) * 0.4
+                elif pattern_type == 'high_risk_keywords':
+                    risk_score += len(matches) * 0.3
+                elif pattern_type == 'medium_risk_keywords':
+                    risk_score += len(matches) * 0.2
+                elif pattern_type == 'financial_keywords':
+                    risk_score += len(matches) * 0.25
+                elif pattern_type == 'app_keywords':
+                    risk_score += len(matches) * 0.2
+        
+        # 여러 패턴이 동시에 나타나면 위험도 증가
+        if len(detected_patterns) >= 2:
+            risk_score *= 1.3
+        
+        # 최종 점수 정규화
+        risk_score = min(risk_score, 1.0)
+        
+        return {
+            'risk_score': risk_score,
+            'detected_patterns': detected_patterns,
+            'scam_indicators': list(set(scam_indicators)),
+            'method': 'keyword_analysis'
+        }
+    
+    def _estimate_scam_type(self, indicators: List[str]) -> str:
+        """키워드를 바탕으로 사기 유형 추정"""
+        
+        type_keywords = {
+            '기관사칭': ['금융감독원', '검찰청', '경찰서', '수사', '조사'],
+            '납치협박': ['납치', '유괴', '응급실', '사고', '죽는다'],
+            '대출사기': ['대출', '저금리', '무담보', '정부지원'],
+            '악성앱': ['앱설치', '다운로드', '권한', '허용'],
+            '대면편취': ['만나서', '직접', '현장', '카페', '현금']
+        }
+        
+        max_matches = 0
+        estimated_type = 'unknown'
+        
+        for scam_type, keywords in type_keywords.items():
+            matches = sum(1 for kw in keywords if kw in indicators)
+            if matches > max_matches:
+                max_matches = matches
+                estimated_type = scam_type
+        
+        return estimated_type
     
     async def _apply_few_shot_learning(self, text: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Few-shot Learning 적용"""
@@ -432,14 +543,23 @@ class LearningEnhancedAnalyzer:
         final_confidence = sum(confidences) / len(confidences)
         
         # 위험 레벨 결정
-        if final_risk_score >= 0.8:
-            risk_level = "critical"
-        elif final_risk_score >= 0.6:
-            risk_level = "high"
-        elif final_risk_score >= 0.4:
-            risk_level = "medium"
+        if final_risk_score >= detection_thresholds.critical_risk:
+            risk_level = "매우 위험"
+        elif final_risk_score >= detection_thresholds.high_risk:
+            risk_level = "위험"
+        elif final_risk_score >= detection_thresholds.medium_risk:
+            risk_level = "주의"
         else:
-            risk_level = "low"
+            risk_level = "낮음"
+        
+        # 주요 지표 통합
+        all_indicators = list(set(
+            base_result.get("key_indicators", []) +
+            few_shot_result.get("key_patterns", [])
+        ))
+        
+        # 권장사항 생성
+        recommendation = self._generate_recommendation(final_risk_score, base_result.get("scam_type", "unknown"))
         
         # 통합 결과
         return {
@@ -447,15 +567,38 @@ class LearningEnhancedAnalyzer:
             "risk_level": risk_level,
             "confidence": final_confidence,
             "scam_type": base_result.get("scam_type", "unknown"),
-            "key_indicators": base_result.get("key_indicators", []),
+            "key_indicators": all_indicators[:10],
             "reasoning": self._create_integrated_reasoning(base_result, few_shot_result, pattern_result),
-            "recommendation": base_result.get("recommendation", "신중하게 대응하세요"),
+            "recommendation": recommendation,
             "analysis_breakdown": {
                 "base_analysis": {"score": base_score, "confidence": base_result.get("confidence", 0.5)},
                 "few_shot_learning": {"score": few_shot_score, "confidence": few_shot_result.get("confidence", 0.5)},
                 "pattern_matching": {"score": pattern_score, "confidence": pattern_result.get("confidence", 0.5)}
             }
         }
+    
+    def _generate_recommendation(self, risk_score: float, scam_type: str) -> str:
+        """위험도와 사기 유형에 따른 권장사항 생성"""
+        
+        base_recommendations = {
+            '기관사칭': "해당 기관에 직접 전화하여 확인하세요.",
+            '납치협박': "침착하게 가족에게 직접 연락하고 112에 신고하세요.",
+            '대출사기': "금융감독원 홈페이지에서 등록업체인지 확인하세요.",
+            '악성앱': "공식 앱스토어 외에는 앱을 설치하지 마세요.",
+            '대면편취': "절대 직접 만나지 말고 경찰에 신고하세요."
+        }
+        
+        recommendation = base_recommendations.get(scam_type, "의심스러운 통화는 즉시 끊고 확인하세요.")
+        
+        # 위험도에 따른 추가 권장사항
+        if risk_score >= 0.8:
+            recommendation = f"🚨 즉시 통화를 끊으세요! {recommendation}"
+        elif risk_score >= 0.6:
+            recommendation = f"⚠️ 매우 주의하세요. {recommendation}"
+        elif risk_score >= 0.4:
+            recommendation = f"🔍 {recommendation}"
+        
+        return recommendation
     
     def _create_integrated_reasoning(self, base_result: Dict, few_shot_result: Dict, pattern_result: Dict) -> str:
         """통합 추론 결과 생성"""
@@ -464,11 +607,11 @@ class LearningEnhancedAnalyzer:
         
         # 기본 분석 추론
         if base_result.get("reasoning"):
-            reasoning_parts.append(f"기본 분석: {base_result['reasoning']}")
+            reasoning_parts.append(f"기본 분석: {base_result['reasoning'][:100]}")
         
         # Few-shot 학습 추론
         if few_shot_result.get("reasoning") and few_shot_result.get("examples_used", 0) > 0:
-            reasoning_parts.append(f"학습 기반 분석: {few_shot_result['reasoning']}")
+            reasoning_parts.append(f"학습 기반 분석: {few_shot_result['reasoning'][:100]}")
         
         # 패턴 매칭 결과
         if pattern_result.get("best_pattern"):
@@ -481,8 +624,6 @@ class LearningEnhancedAnalyzer:
         """사용자 피드백으로부터 학습"""
         
         # 분석 결과 찾기 (실제로는 세션 저장소에서 조회)
-        # 여기서는 간단화하여 새로운 학습 예시로 처리
-        
         learning_example = LearningExample(
             text="", # 실제로는 원본 텍스트 저장
             actual_label=actual_label,
@@ -549,7 +690,6 @@ class LearningEnhancedAnalyzer:
             for example in scam_examples:
                 all_words.extend(example.text.lower().split())
             
-            from collections import Counter
             word_freq = Counter(all_words)
             
             # 자주 나타나는 키워드들로 새 패턴 생성
@@ -705,7 +845,8 @@ class LearningEnhancedAnalyzer:
             "ready_for_learning": len(self.learning_examples) >= self.config["learning_threshold"]
         }
 
-# 기존 analyzer를 학습 강화 버전으로 업그레이드
+
+# 기존 호환성을 위한 함수들
 def create_learning_enhanced_analyzer():
     """학습 강화 분석기 생성"""
     return LearningEnhancedAnalyzer(llm_manager)
