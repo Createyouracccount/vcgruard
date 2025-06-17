@@ -14,6 +14,7 @@ import signal
 from pathlib import Path
 from datetime import datetime
 
+
 # 프로젝트 루트를 패스에 추가
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -85,10 +86,11 @@ class VoiceGuardApp:
             print("✅ 환경 변수 로드 완료")
         except ImportError:
             print("❌ python-dotenv가 설치되지 않음")
-            print("📝 실행: pip install python-dotenv")
+            print("❌ conda 가상환경이 설치되지 않음")
+            print("📝 실행: pip install python-dotenv / 또는 conda 가상환경 활성화 진행")
             return False
         
-        # Google API 키 확인 (필수)
+        # Google API 키 확인 (필수 / Gemini key 사용을 위해 필요)
         google_key = os.getenv("GOOGLE_API_KEY")
         if not google_key:
             print("❌ GOOGLE_API_KEY가 설정되지 않음")
